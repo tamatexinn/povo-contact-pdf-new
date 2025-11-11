@@ -1,0 +1,73 @@
+import sys
+from pypdf import PdfReader
+from datetime import date # 日付チェックのために追加
+
+def check_password(target_file, password):
+    """
+    指定されたPDFファイルのパスワードが正しいかどうかを判定します。
+
+    Args:
+        target_file (str): チェック対象のPDFファイルパス。
+        password (str): 試行するパスワード。
+
+    Returns:
+        bool: パスワードが正しければ True、そうでなければ False。
+              PDFファイルが存在しない場合や、パスワードが設定されていない場合も False を返します。
+    """
+    try:
+        with open(target_file, 'rb') as pdf_file:
+            pdf_reader = PdfReader(pdf_file)
+            if pdf_reader.is_encrypted:
+                # decrypt() は成功すると 0 より大きい値を返す
+                try:
+                    if pdf_reader.decrypt(password) > 0:
+                        return True
+                    else:
+                        return False # パスワードが間違っている
+                except Exception:
+                    # pypdf は不正なパスワードで例外を出すこともある
+                    return False
+            else:
+                # パスワードが設定されていない
+                return False
+    except FileNotFoundError:
+        print(f"エラー: ファイル '{target_file}' が見つかりません。")
+        # ファイルが見つからない場合、ループを続行しても無駄なのでプログラムを終了させる
+        sys.exit(1) 
+    except Exception as e:
+        print(f"予期せぬエラーが発生しました: {e}")
+        return False
+
+def find_password(target_pdf):
+    """
+    指定された範囲のパスワードを総当たりで試行します。
+    """
+    print(f"ファイル '{target_pdf}' のパスワードチェックを開始します...")
+    
+    for year in range(1980, 2010): # 1980 から 2009 まで
+        for month in range(1, 13): # 1月 から 12月 まで
+            for day in range(1, 32): # 1日 から 31日 まで
+                
+                # --- 日付として正しいか簡易チェック ---
+                try:
+                    # 2月30日など、無効な日付はここでエラーになりスキップされる
+                    date(year, month, day) 
+                except ValueError:
+                    continue # 次の日へ
+
+                # --- YYYY-MM-DD 形式 (例: 1980-01-01) ---
+                # :02 は「2桁に満たない場合、左側を0で埋める」という意味
+                password = f"{year}-{month:02}-{day:02}"
+                print(f"試行中: {password}") # どのパスワードを試しているか表示
+
+                if check_password(target_pdf, password):
+                    print(f"\nパスワードが見つかりました: {password}")
+                    return True # 発見したので関数を終了
+
+    # 全てのループが完了しても見つからなかった場合
+    print("\n全てのパスワードを試しましたが、正しいパスワードは見つかりませんでした。")
+    return False
+
+if __name__ == '__main__':
+    target_pdf = "JP-DAZM5FVSWGN8_contract_120637.pdf"  # テストするPDFファイルのパス
+    find_password(target_pdf)
